@@ -5,7 +5,7 @@ Copyright (c) 2001 - 2002 The International Computer Science Institute
 
 Copyright (c) 2002 - 2002 Lawrence Berkeley National Laboratory
 
-Copyright (c) 2002 - 2002 Jose Maria Gonzalez (chema@cs.berkeley.edu)
+Copyright (c) 2002 - 2016 Jose Maria Gonzalez (chema@cs.berkeley.edu)
 
 
 
