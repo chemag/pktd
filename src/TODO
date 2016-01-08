@@ -1,0 +1,42 @@
+
+TODO list
+---------
+
+- change file names to something more descriptive. Things like 
+	"protocol.h" are too generic, so collisions are going to 
+	occur. 
+
+- both clients and daemon should be able to select a network 
+	interface. We should also think on an API call for the client 
+	to know which interfaces can be used. 
+
+- the cookie should be definitely more complicated
+
+- from the client's perspective, the cookie should reside in the 
+	client code instead of in the libwire, so that more than one 
+	connection to the daemon can be open at the same time
+
+	- actually we could use something like daemon.h:pcapd_client_item 
+		to bring together all the per-client state at libwire
+
+- add new state, "invalid", that would just apply to item 0 in the 
+	pcapd_client_table table
+
+
+
+- 0,0,0 as checkpoint request implies infinite files. Ask VP
+
+- Use log in production version:
+	- write a /var/run/pcapd.pid (currently no permission to do it)
+	- should we use syslog? 
+		- If so, we don't have a /etc/syslog.conf entry
+	- check printf's that still remain in the code
+
+		-> Ask VP
+
+- timeout all read's and write's. Check pcap_send and pcap_send at protocol.c
+
+- VP's old wire used 1 as return code for ok, error otherwise. We use 
+	0 for OK, <0 for error. It works currently, but we should think on 
+	unifying it.
+

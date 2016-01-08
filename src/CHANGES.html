@@ -1,0 +1,432 @@
+<html>
+<head>
+<title>pcapd Change History
+</title>
+</head>
+<body>
+
+
+<h1>pcapd Change History</h1>
+
+<hr>
+<ul>
+
+
+<li><b>[JMG] Wed Apr 3 18:18:00 PDT 2002</b><br>
+<ul>
+	<li>Fixed the way the daemon reports errors. The macro PCAPD_PRINTF 
+		opens the tty name of the calling shell and writes fatal errors 
+		so that a failing daemon can report why it's failing. 
+</ul>
+
+
+<li><b>[JMG] Tue Apr 2 15:45:00 PDT 2002</b><br>
+<ul>
+	<li>Fixed the way packet length is considered in the daemon. When 
+		the daemon filters a packet, it may have to consider up to 4 different 
+		lengths:
+		<ul>
+			<li>len: the packet length
+			<li>caplen: the actual captured length
+			<li>device.snaplen: maximum number of bytes to capture by the device
+			<li>client.snaplen: maximum number of bytes to capture requested by
+					the client
+		</ul>
+
+	<br>Typically, 
+		<ul>
+			<li>caplen &lt;= len
+			<li>client.snaplen &lt;= device.snaplen
+			<li>caplen &lt;= device.snaplen
+		</ul>
+
+	<br>The daemon has to check if client.snaplen &lt;= caplen, and in that 
+		case cut the caplen.
+</ul>
+
+
+<li><b>[JMG] Mon Feb 11 19:02:00 PDT 2002</b><br>
+<ul>
+	<li>Added BSD-style licenses to all the source code
+</ul>
+
+
+<li><b>[JMG] Mon Jan 21 20:41:00 PDT 2002</b><br>
+<ul>
+	<li>Added packet injection capabilities. They're located 
+		in the <code>injection.h/c</code> module. It uses 
+		two different interfaces to write IP packets, raw 
+		sockets and link-layer direct writing. Currently 
+		only the second one is tested. 
+
+	<br>Raw sockets vs. link-layer interface writing choice.
+
+	<br>Alternatives: 
+
+	<ul>
+		<li>raw sockets
+			<br><code>socket (AF_INET, SOCK_RAW, ...)</code>
+
+		<li>link interface
+			<br><code>open ("/dev/bpf%d", O_RDWR)</code> in FreeBSD
+			<br><code>socket (PF_PACKET, SOCK_RAW, ...)</code> or 
+				<code>socket (PF_INET, SOCK_PACKET, ...)</code> in Linux
+			<br><code>open ("/dev/dlpi", O_RDWR)</code> or 
+				<code>open ("/dev/hme%d", O_RDWR)</code> in Solaris
+	</ul>
+
+
+	<br>Pros and Cons: 
+
+	<ul>
+		<li>raw sockets
+		<ul>
+			<li>only works for priviliged users
+			<li>"under some x86 BSD implementations the IP header length and 
+				fragmentation bits need to be in host byte order, and under 
+				others, network byte order. 
+			<li>Solaris does not allow you to set many IP header related bits 
+				including the length, fragmentation flags, or IP options. 
+			<li>Linux requires SO_BROADCAST to be set on the raw socket for the 
+				injection of broadcast IP datagrams (which libnet now does)." 
+				(from <a href="www.packetfactory.net/libnet/manual/4.html#s4.5">
+				www.packetfactory.net/libnet/manual/4.html#s4.5</a>)
+		</ul>
+
+		<li>link interface
+		<ul>
+			<li>slightly more complicated API
+			<li>works on FreeBSD/Solaris needing only bpf/dlpi/hme write permission. 
+				In Linux you need root privileges to run either API, which anyway is 
+				needed to open libpcap
+			<li>needs another /dev/bpf%d device on FreeBSD
+			<li>you have to build the link-layer header. This means: 
+			<ul>
+				<li>the daemon must support any possible underlying device. 
+					While this is typically Ethernet, this assumption is definitely not 
+					the right approach. On the other hand, BPF itself seems to be 
+					supported only on Ethernet, SLIP, and PPP drivers (the latter 
+					only for reading)
+				<li>the daemon need also use ARP to translate from the two IP 
+					addresses written in the packet to the two corresponding link 
+					addresses (at least at my lab routers check that). I find 
+					adding an ARP implementation to pcapd hypertrophic (not so: 
+					check ./libnet/util/Get-mac/get_mac.c )
+				<li>a better alternative may be to use the arp cache, but I'm unable 
+					to find info on how to access it
+				<li>you have to access to the route table in case the arp cache 
+					doesn't contain the IP address you're looking for
+				<li>easiest way: use system() to wrap arp -a and route -n
+			</ul>
+		</ul>
+	</ul>
+
+
+
+	<br>Other comments:
+
+	<ul>
+		<li><a href="http://www.packetfactory.net/Projects/Libnet/">
+			libnet</a> suggests using link-layer injection 
+      (www.packetfactory.net/libnet/manual/4.html#s4.5):
+      "Because of these quirks, unless your code isn't designed to be 
+      multi-platform, you might want to consider employing libnet's
+      link-layer interface instead."
+
+		<li><a href="http://www.isi.edu/nsnam/ns">ns</a>
+			suggests raw sockets (www.isi.edu/nsnam/ns/doc/node480.html)
+			"BPF also supports sending link-layer frames. This is generally 
+			not suggested, as an entire properly-formatted frame must be 
+			created prior to handing it off to BPF. This may be problematic 
+			with respect to assigning proper link-layer headers for next-hop 
+			destinations. It is generally preferable to use the raw IP 
+			network object for sending IP packets, as the system's routing 
+			function will be used to determine proper link-layer encapsulating 
+			headers."
+	</ul>
+</ul>
+
+
+<li><b>[JMG] Tue Nov 20 12:07:00 PDT 2001</b><br>
+<ul>
+	<li>Fixed the enforcing of client-requested snaplens. The first 
+		implementation just used 65535 for both the kernel and the 
+		clients' filters. The snaplen parameter in libwire's wire_init 
+		call is therefore useful. 
+
+
+	<br>Implementation explanation. Assuming several clients requesting 
+		filterings with different snaplen requirements, how should the 
+		daemon set the device snaplen so that all the clients are happy? 
+		On the one hand, the device snaplen has to be greater or equal 
+		than any of the client's snaplen. On the other hand, we want the 
+		device snaplen to be as small as possible. Bigger snaplens imply 
+		stressing the filtering device, which affects the capturing 
+		performance. Using the maximum snaplen covers all possible client 
+		sets, but is bad in performance terms. 
+
+
+	<br>To add to the problem, the set of clients requiring capturing 
+		is dynamic. Clients join the daemon, have their measurements 
+		performed, and then leave. A fixed-snaplen device is not a valid 
+		solution. 
+
+		<br>There are two alternatives to solve this problem: 
+
+		<ol>
+			<li>One dynamic device (snaplen switching)
+				<br>- there's always only one device open (the exception is during 
+					snaplen changes)
+				<br>- the snaplen for that device is the maximum amongst all the 
+					snaplens requested by the clients. 
+				<br>&nbsp;&nbsp;<code>snaplen = max(snaplen_i)</code>
+				<br>- when a packet fires the device filter, the daemon trims it 
+					following the client's snaplen
+				<br>- when a new client requests <code>snaplen_n &gt; snaplen</code>, 
+					or the client with the maximum snaplen leaves, the filter has to 
+					change the device snaplen (<b>dynamic snaplen</b>)
+				<br>- we have to ensure that under no circumstances are packets 
+					lost or repeated. This means we have to be very careful during 
+					the snaplen change ("smooth transitions"). 
+
+				<br>Unfortunately the pcap library doesn't provide a way to reconfigure 
+					a device snaplen (this is probably a desirable feature in pcap). 
+					Instead of closing the device and reopening it with the new 
+					snaplen, we open a second device, and once the daemon is sure 
+					that the new device is receiving the same packets than the 
+					first one (i.e., the devices are <b>synchronized</b>), the 
+					deamon starts using packets from the second device and closes 
+					the first one. 
+				<br>- how to synchronize the two devices? We cannot rely on packet 
+					timestamps being the same, as two devices getting the same 
+					packet may get slightly different timestamps (in FreeBSD I'm 
+					getting differences between 4 and 7 microseconds). We would 
+					probably need fingerprinting packet contents. 
+				<br>&nbsp;
+				<br>pros:
+				<br>- efficient in cases with just one client: the snaplen is 
+					exactly that of the only client present.
+				<br>&nbsp;
+				<br>cons:
+				<br>- need two devices, which may be a problem in some OSs. For 
+					example, FreeBSD 4.1 seems to have four bpf devices by default. 
+				<br>- the device snaplen is the maximum client snaplen. Having to 
+					serve a single client that requests huge packets and whose 
+					filter activates seldom, may compromise the performance of 
+					high-speed packet capture.
+				<br>- smooth transitions are hard because of synchronization
+				<br>&nbsp;
+
+			<li>Two static devices
+				<br>- there are always two devices open. One of them ("<b>slow 
+					device</b>") will have a snaplen of 65535, which ensures all 
+					clients will be served. The other one will have a small 
+					snaplen ("<b>fast device</b>"), and will be used to attend 
+					high-speed packet capture. 
+				<br>- very easy to implement: we just map clients to the fast 
+					filter or the slow filter depending on their requested snaplen. 
+					As always, packets are trimmed to tailor the length to each 
+					client's snaplen. 
+				<br>- no dynamic change of device is needed, which avoids 
+					the synchronization issue.
+				<br>- how to select the fast filter's snaplen? The typical use 
+					of small snaplen capturing is in the case of analyzing link, 
+					network, and transport protocols' data. Therefore, the size 
+					will be that of LL+IP+TCP/UDP/ICMP(header). Unfortunately, 
+					libpcap doesn't let you express this directly, and we need 
+					to worry about capturing TCP options (though not about both
+					TCP options and IP options, as IP options are virtually never 
+					used). Therefore, the right formulation is LL + IP (20) + 
+					TCP+options/UDP/ICMP header (<60), i.e., LL + 80.
+				<br>&nbsp;
+				<br>pros:
+				<br>- easier to implement. There are no dynamic device changes 
+					(snaplens are constant), so we avoid the synchronization issue 
+					(no glitches during snaplen switching).
+				<br>- tends to follow the bimodal use pattern that we envision 
+					for the daemon. One set of clients requiring multiple accesses 
+					to only the link and network layers (fast measurements), and 
+					another interested in higher communication layers (slow 
+					measurements). 
+				<br>- a more efficient solution except in the case of just one 
+					client.
+				<br>&nbsp;
+				<br>cons:
+				<br>- need two devices continuously, while the dynamic alternative 
+					requires them only during synchronization periods
+				<br>- less efficient in the case of only one client (which we 
+					don't envision to be the common case)
+		</ol>
+
+		<br>We have implemented the two-device solution
+</ul>
+
+
+<li><b>[JMG] Mon Nov 05 11:41:00 PDT 2001</b><br>
+<ul>
+	<li>Fixed the division between the three main modules: library (libwire),
+		daemon (pcapd), and intermediate protocol. Now the library doesn't
+		access to the daemon header nor viceversa. All common data between
+		the library and the daemon resides now in the protocol. This should 
+		also help in making the library thread-safe. 
+</ul>
+
+
+<li><b>[JMG] Mon Nov 05 10:36:00 PDT 2001</b><br>
+<ul>
+	<li>Added version.h to be able to bump version numbers. We will follow 
+		Linux <a href="http://www.linuxgazette.com/issue32/bandel.html">Kernel 
+		Version Numbering</a> (<i>&lt;version&gt;.&lt;major number&gt;.&lt;minor 
+		number&gt;</i>). We will also bump to version 0.7.1. 
+</ul>
+
+
+<li><b>[JMG] Fri Sep 14 14:59:00 PDT 2001</b><br>
+<ul>
+	<li>Added a third working mode, "local file dumping", in which you 
+		get the messages from a socket (like the old "port" mode) but at 
+		the same time the wire library dumps the packet to a file for you
+</ul>
+
+
+<li><b>[JMG] Thu Sep 13 15:43:00 PDT 2001</b><br>
+<ul>
+	<li>Error code management revamped
+</ul>
+
+
+<li><b>[JMG] Wed Sep 12 18:45:00 PDT 2001</b><br>
+<ul>
+	<li>Checked all possible combinations between OS and IPC. Results 
+		are depicted in the following table:
+
+		<table border="1" cellpadding="0" cellspacing="0" width="90%">
+			<tr>
+				<th>OS / IPC
+				<th>Sockets
+				<th>Shared memory
+			</tr>
+			<tr>
+				<th>Solaris
+				<td><center>OK</center>
+				<td><center>OK</center>
+			</tr>
+			<tr>
+				<th>Linux (as root)
+				<td><center>OK</center>
+				<td><center>OK</center>
+			</tr>
+			<tr>
+				<th>FreeBSD
+				<td><center>OK</center>
+				<td><center>OK</center>
+			</tr>
+		</table>
+
+</ul>
+
+
+<li><b>[JMG] Wed Sep 12 18:30:00 PDT 2001</b><br>
+<ul>
+	<li>Run Rational Software's purify on the Solaris version. Fixed 
+		numerous bugs, especially related to socket leaking
+</ul>
+
+
+<li><b>[JMG] Tue Sep 11 22:40:00 PDT 2001</b><br>
+<ul>
+	<li>Ported the daemon to Solaris
+</ul>
+
+
+<li><b>[JMG] Tue Sep 11 18:40:00 PDT 2001</b><br>
+<ul>
+	<li>Got rid of the USING_BPF compilation flag. As the BPF packet filter 
+		exists only in FreeBSD, we have substituted the flag with 
+		__FreeBSD__. Immediate mode seems to be the default for both 
+		Solaris and Linux, so nothing similar to BIOCIMMEDIATE is needed 
+		for them
+</UL>
+
+
+<li><b>[JMG] Tue Sep 11 13:40:00 PDT 2001</b><br>
+<ul>
+	<li>Fixed signal behavior. Now you can kill the daemon by sending it 
+		either SIGTERM or SIGKILL (better the first one)
+</ul>
+
+
+<li><b>[JMG] Thu Sep 06 11:41:00 PDT 2001</b><br>
+<ul>
+	<li>Changed the interfaces for wire_init and open_pcapd_daemon (see 
+		wire.h,c). In retrospective, it was a bad idea to try to overwrite 
+		the write_file variable with the full name of the file. Now this 
+		information (the file name) will be located at the 
+		protocol.c::pcapd_prot_file_path variable, which is accessible 
+		from wire.c 
+</ul>
+
+
+<li><b>[JMG] Wed Sep 05 17:07:00 PDT 2001</b><br>
+<ul>
+	<li>The code needs to be portable to non-gcc C compilers, so // 
+		comments have been changed to /* ... */
+</ul>
+
+
+<li><b>[JMG] Sat Jul 14 21:30:00 PDT 2001</b><br>
+<ul>
+	<li>Added to the CVS repository at 
+			www.aciri.org:/usr/local/share/doc/apache/cvs
+</ul>
+
+
+<li><b>[JMG] Mon Apr 30 21:30:00 PDT 2001</b><br>
+<ul>
+	<li>Made it work on Linux
+</ul>
+
+
+<li><b>[JMG] Sat Apr 28 17:33:00 PDT 2001</b><br>
+<ul>
+	<li>Commented out the BPF BIOCIMMEDIATE ioctl to ensure the daemon is 
+	a pcap one instead of just a BPF one (BPF is just one of the libraries 
+	the more-general packet filter pcap uses). This call is really useful 
+	in the case of pcap daemons that indeed use the BPF library: it ensures 
+	that the filter process is waken up (select) every time a new packet 
+	has arrived, and not only when the buffer underneath is full. It makes 
+	the daemon's behavior more logical in the case of low-matching filters. 
+
+	<li>I don't think it is possible to generalize the immediate read 
+	ioctl with a standard pcap function (should ask VP anyway), so 
+	the solution we should use is to add the packet capture type as a 
+	configure decision (check elmer:/usr/local/lib/libpcap) and use it 
+	to get a compile-time flag. The compile-time flag mechanism has 
+	been added to the code already (-DUSING_BPF).
+
+	<li>There's probably a similar mechanism to the BPF immediate reading 
+	ioctl in the remain packet capture types (BPF, pf, enet, snit, nit, 
+	snoop, dlpi, linux, enet, and snit).
+</ul>
+
+
+<li><b>[JMG] Thu Apr 26 21:10:00 PDT 2001</b><br>
+<ul>
+	<li>Added a new IPC method between the smgr and fmgr processes. Now 
+	it's possible to communicate both processes 1) using sockets, and 
+	2) using the previous shared-memory&amp;semaphore mechanism.
+</ul>
+
+
+<li><b>[JMG] Fri Jan 18 15:00:00 PDT 2001</b><br>
+<ul>
+	<li>Fresh version. 
+</ul>
+
+
+
+</ul>
+
+</body>
+</html>
+
