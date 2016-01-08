@@ -41,7 +41,9 @@
 #include <sys/time.h>
 #include <netinet/in.h>
 
-#if defined(__sun__)
+#if defined(__linux__)
+#include "bpf.h"
+#elif defined(__sun__)
 #include "bpf.h"
 #else
 #include <net/bpf.h>

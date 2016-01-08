@@ -58,7 +58,9 @@
 
 #include <sys/ioctl.h>
 
-#if defined(__sun__)
+#if defined(__linux__)
+#include "bpf.h"
+#elif defined(__sun__)
 #include "bpf.h"
 #else
 #include <net/bpf.h>
@@ -83,10 +85,6 @@ extern char pktd_version[];
 
 /* <errno.h>::errno global variable */
 extern int errno;
-
-#if defined(__sun__)
-extern char *sys_errlist[];
-#endif
 
 
 /* ensure one and only one IPC method */
@@ -214,7 +212,7 @@ char* pktd_interface = NULL;
 int debug_flag = 0;
 
 /* log level */
-LogLevel log_level = SYSLOG_LEVEL_INFO;
+extern LogLevel log_level;
 
 
 
@@ -587,15 +585,21 @@ int pktd_daemonize ()
 
 	/* creates a new session and group */
 	if (setsid () < 0) {
-		error ("setsid(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("setsid(): %s (%d)\n", buf, errno);
 		return -1;
 	}
 
 	/* fork again so that the child obtains a process group id equal to zero */
 	switch (fork()) {
 		case -1:
-			error ("fork(): %s (%d)\n", sys_errlist[errno], errno);
+			{
+			char buf[1024];
+			strerror_r(errno, buf, 1024);
+			error ("fork(): %s (%d)\n", buf, errno);
 			return -1;
+			}
 		case 0:
 			/* (second) child process */
 			break;
@@ -610,15 +614,21 @@ int pktd_daemonize ()
 
 	/* open the new stdin, stdout, and stderr */
 	if ((fd = open ("/dev/null", O_RDWR)) < 0) {
-		error ("open(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("open(): %s (%d)\n", buf, errno);
 		return -1;
 	};
 	if (dup (fd) < 0) {
-		error ("dup(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("dup(): %s (%d)\n", buf, errno);
 		return -1;
 	}
 	if (dup (fd) < 0) {
-		error ("dup(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("dup(): %s (%d)\n", buf, errno);
 		return -1;
 	}
 
@@ -675,14 +685,18 @@ int pktd_init_common (struct pktd_client_item **pktd_client_tablep,
 	/* create the clients table (later forking will create different copies) */
 	if ((*pktd_client_tablep = (struct pktd_client_item *)calloc 
 			(DAEMON_MAX_CLIENTS, sizeof(struct pktd_client_item))) == 0) {
-		error ("calloc(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("calloc(): %s (%d)\n", buf, errno);
 		return -1;
 	}
 
 	/* create the devices table (later forking will create different copies) */
 	if ((*pktd_device_tablep = (struct pktd_device_item *)calloc 
 			(DAEMON_NUM_DEVICES, sizeof(struct pktd_device_item))) == 0) {
-		error ("calloc(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("calloc(): %s (%d)\n", buf, errno);
 		return -1;
 	}
 #endif
@@ -706,14 +720,18 @@ int pktd_init_common (struct pktd_client_item **pktd_client_tablep,
 	if ((*pktd_client_tablep = (struct pktd_client_item *)mmap (NULL, 
 			DAEMON_MAX_CLIENTS * sizeof(struct pktd_client_item), PROT_READ | 
 			PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0)) == MAP_FAILED) {
-		error ("mmap(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("mmap(): %s (%d)\n", buf, errno);
 		return -1;
 	}
 
 	if ((*pktd_device_tablep = (struct pktd_device_item *)mmap (NULL, 
 			DAEMON_NUM_DEVICES * sizeof(struct pktd_device_item), PROT_READ | 
 			PROT_WRITE, MAP_SHARED | MAP_ANON, -1, 0)) == MAP_FAILED) {
-		error ("mmap(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("mmap(): %s (%d)\n", strerrno);
 		return -1;
 	}
 
@@ -721,11 +739,15 @@ int pktd_init_common (struct pktd_client_item **pktd_client_tablep,
 #elif (defined(__linux__) || defined(__sun__))
 #define FILE_MODE (S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 	if ((shmem_client_fd = open("/tmp/zero", O_RDWR | O_CREAT, FILE_MODE)) < 0) {
-		error ("open(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("open(): %s (%d)\n", buf, errno);
 		pktd_exit(1);
 	};
 	if ((shmem_device_fd = open("/tmp/one", O_RDWR | O_CREAT, FILE_MODE)) < 0) {
-		error ("open(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("open(): %s (%d)\n", buf, errno);
 		pktd_exit(1);
 	};
 
@@ -745,13 +767,17 @@ int pktd_init_common (struct pktd_client_item **pktd_client_tablep,
 	if ((*pktd_client_tablep = (struct pktd_client_item *) mmap (NULL, 
 			DAEMON_MAX_CLIENTS * sizeof(struct pktd_client_item), PROT_READ | 
 			PROT_WRITE, MAP_SHARED, shmem_client_fd, 0)) == MAP_FAILED) {
-		error ("mmap(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("mmap(): %s (%d)\n", buf, errno);
 		return -1;
 	}
 	if ((*pktd_device_tablep = (struct pktd_device_item *) mmap (NULL, 
 			DAEMON_NUM_DEVICES * sizeof(struct pktd_device_item), PROT_READ | 
 			PROT_WRITE, MAP_SHARED, shmem_device_fd, 0)) == MAP_FAILED) {
-		error ("mmap(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("mmap(): %s (%d)\n", buf, errno);
 		return -1;
 	}
 #endif
@@ -831,7 +857,9 @@ void pktd_empty_entry (int idc)
 	/* send the message */
 	if ((nbytes = write (ipc_socket, buffer, DAEMON_PROT_MINHEADER)) < 0) {
 		/* error while writing the message: the socket is dead */
-		error ("write(internal socket): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("write(internal socket): %s (%d)\n", buf, errno);
 		pktd_exit(1);
 	}
 #endif
@@ -866,7 +894,9 @@ void pktd_refresh_client_table (int idc)
 	buffer[1] = (u_char)(idc & 0xff);
 	if ((nbytes = write (ipc_socket, buffer, DAEMON_PROT_MINHEADER)) < 0) {
 		/* error while writing the message: the socket is dead */
-		error ("write(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("write(): %s (%d)\n", buf, errno);
 		pktd_exit(1);
 	}
 
@@ -880,7 +910,9 @@ void pktd_refresh_client_table (int idc)
 	if ((nbytes = write (ipc_socket, (u_char *)(pktd_client_table+idc), 
 			sizeof(struct pktd_client_item))) < 0) {
 		/* error while writing the message: the socket is dead */
-		error ("write(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("write(): %s (%d)\n", buf, errno);
 		pktd_exit(1);
 	}
 #endif
@@ -957,7 +989,9 @@ void pktd_get_stats (int idd, struct pcap_stat *stat)
 		buffer[1] = (u_char)(idd & 0xff);
 		if ((nbytes = write (ipc_socket, buffer, DAEMON_PROT_MINHEADER)) < 0) {
 			/* error while writing the message: the socket is dead */
-			error ("write(): %s (%d)\n", sys_errlist[errno], errno);
+			char buf[1024];
+			strerror_r(errno, buf, 1024);
+			error ("write(): %s (%d)\n", buf, errno);
 			pktd_exit(1);
 		}
 
@@ -1017,7 +1051,9 @@ void pktd_flush_client (int idc)
 	buffer[1] = (u_char)(idc & 0xff);
 	if ((nbytes = write (ipc_socket, buffer, DAEMON_PROT_MINHEADER)) < 0) {
 		/* error while writing the message: the socket is dead */
-		error ("write(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("write(): %s (%d)\n", buf, errno);
 		pktd_exit(1);
 	}
 
@@ -1053,7 +1089,9 @@ void pktd_report_device_info (int idd)
 	buffer[1] = (u_char)(idd & 0xff);
 	if ((nbytes = write (ipc_socket, buffer, DAEMON_PROT_MINHEADER)) < 0) {
 		/* error while writing the message: the socket is dead */
-		error ("write(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("write(): %s (%d)\n", buf, errno);
 		pktd_exit(1);
 	}
 
@@ -1067,7 +1105,9 @@ void pktd_report_device_info (int idd)
 	if ((nbytes = write (ipc_socket, (u_char *)(pktd_device_table+idd), 
 			sizeof(struct pktd_device_item))) < 0) {
 		/* error while writing the message: the socket is dead */
-		error ("write(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("write(): %s (%d)\n", buf, errno);
 		pktd_exit(1);
 	}
 
@@ -1124,8 +1164,12 @@ again1:
 		if (errno == EINTR) {
 			goto again1;
 		}
-		error ("read(): %s (%d)\n", sys_errlist[errno], errno);
+		{
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("read(): %s (%d)\n", buf, errno);
 		pktd_exit(1);
+		}
 	}
 
 	switch (buffer[0]) {
@@ -1150,8 +1194,12 @@ again2:
 					tmpp += nbytes;
 					goto again2;
 				}
-				error ("read(): %s (%d)\n", sys_errlist[errno], errno);
+				{
+				char buf[1024];
+				strerror_r(errno, buf, 1024);
+				error ("read(): %s (%d)\n", buf, errno);
 				pktd_exit(1);
+				}
 			}
 
 			(pktd_device_table+idd)->datalink = tmp_item.datalink;
@@ -1173,8 +1221,12 @@ again3:
 					tmpp += nbytes;
 					goto again3;
 				}
-				error ("read(): %s (%d)\n", sys_errlist[errno], errno);
+				{
+				char buf[1024];
+				strerror_r(errno, buf, 1024);
+				error ("read(): %s (%d)\n", buf, errno);
 				pktd_exit(1);
+				}
 			}
 			(pktd_device_table+idd)->total_stat = tmp_stat;
 			break;
@@ -1230,8 +1282,12 @@ again4:
 		if (errno == EINTR) {
 			goto again4;
 		}
-		error ("read(): %s (%d)\n", sys_errlist[errno], errno);
+		{
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("read(): %s (%d)\n", buf, errno);
 		pktd_exit(1);
+		}
 	}
 
 	switch (buffer[0]) {
@@ -1247,7 +1303,9 @@ again4:
 			buffer[1] = (u_char)(idd & 0xff);
 			if ((nbytes = write (fd, buffer, DAEMON_PROT_MINHEADER)) < 0) {
 				/* error while writing the message: the socket is dead */
-				error ("write(): %s (%d)\n", sys_errlist[errno], errno);
+				char buf[1024];
+				strerror_r(errno, buf, 1024);
+				error ("write(): %s (%d)\n", buf, errno);
 				pktd_exit(1);
 			}
 
@@ -1259,7 +1317,9 @@ again4:
 			if ((nbytes = write (fd, (u_char *)&stat, 
 					sizeof(struct pcap_stat))) < 0) {
 				/* error while writing the message: the socket is dead */
-				error ("write(): %s (%d)\n", sys_errlist[errno], errno);
+				char buf[1024];
+				strerror_r(errno, buf, 1024);
+				error ("write(): %s (%d)\n", buf, errno);
 				pktd_exit(1);
 			}
 			break;
@@ -1278,8 +1338,12 @@ again5:
 					tmpp += nbytes;
 					goto again5;
 				}
-				error ("read(): %s (%d)\n", sys_errlist[errno], errno);
+				{
+				char buf[1024];
+				strerror_r(errno, buf, 1024);
+				error ("read(): %s (%d)\n", buf, errno);
 				pktd_exit(1);
+				}
 			}
 
 			/* do a table_change */
@@ -2111,7 +2175,9 @@ void pktd_smgr_main (void *argv)
 	memset (&saddr, 0, sizeof(saddr));
 	alen = sizeof(saddr);
 	if ((fd = accept (ipc_socket, (struct sockaddr *)&saddr, &alen)) < 0) {
-		error ("accept(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("accept(): %s (%d)\n", buf, errno);
 		pktd_exit (1);
 	}
 	close (ipc_socket);
@@ -2122,8 +2188,10 @@ void pktd_smgr_main (void *argv)
 	/* create the external socket */
 	port = PROT_SERVERPORT;
 	if ((main_socket = pktd_server_socket (&port)) < 0) {
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
 		error ("Cannot open main server socket (%s): %s (%d)\n",
-				wire_err_msg(), sys_errlist[errno], errno);
+				wire_err_msg(), buf, errno);
 		pktd_exit(1);
 	}
 
@@ -2162,7 +2230,9 @@ void pktd_smgr_main (void *argv)
 		memset (&saddr, 0, sizeof(saddr));
 		alen = sizeof(saddr);
 		if ((ctrlfd = accept (main_socket, (struct sockaddr *)&saddr, &alen)) < 0) {
-			error ("accept(): %s (%d)\n", sys_errlist[errno], errno);
+			char buf[1024];
+			strerror_r(errno, buf, 1024);
+			error ("accept(): %s (%d)\n", buf, errno);
 			pktd_exit(1);
 		}
 		(void)pktd_serve_client (ctrlfd);
@@ -2207,7 +2277,7 @@ void pktd_fmgr_main (void *argv)
 	fd_set fds;
 	int result;
 	int nfds;
-	int npackets;
+	int npackets __attribute__((unused));
 
 	debug1 ("pktd_fmgr_main(%d): initializing filters (%s)\n", (int)getpid(), 
 			null_filter);
@@ -2268,7 +2338,11 @@ void pktd_fmgr_main (void *argv)
 			if (errno == EINTR) {
 				continue;
 			}
-			log ("select(): %s (%d)\n", sys_errlist[errno], errno);
+			{
+			char buf[1024];
+			strerror_r(errno, buf, 1024);
+			log ("select(): %s (%d)\n", buf, errno);
+			}
 		}
 
 		/* if there's a packet from any pcap device, process it */
@@ -2606,8 +2680,10 @@ void pktd_client_table_change ()
 
 			if (set_pcap_filter (idd, new_filter[idd]) < 0) {
 				/* this shouldn't happen!! */
+				char buf[1024];
+				strerror_r(errno, buf, 1024);
 				error ("Cannot set device filter %s: %s (%d)\n", 
-						(pktd_device_table+idd)->filter, sys_errlist[errno], errno);
+						(pktd_device_table+idd)->filter, buf, errno);
 				pktd_exit(1);
 			}
 		}
@@ -3097,7 +3173,9 @@ void pktd_install_signal_handlers ()
 				action.sa_handler = pktd_special_signal_handler;
 				action.sa_flags = 0;
 				if (sigaction (num, &action, &old_action) == -1) {
-					log ("sigaction(): %s (%d)\n", sys_errlist[errno], errno);
+					char buf[1024];
+					strerror_r(errno, buf, 1024);
+					log ("sigaction(): %s (%d)\n", buf, errno);
 				}
 				break;
 
@@ -3106,7 +3184,9 @@ void pktd_install_signal_handlers ()
 				action.sa_handler = pktd_signal_handler;
 				action.sa_flags = 0;
 				if (sigaction (num, &action, &old_action) == -1) {
-					log ("sigaction(): %s (%d)\n", sys_errlist[errno], errno);
+					char buf[1024];
+					strerror_r(errno, buf, 1024);
+					log ("sigaction(): %s (%d)\n", buf, errno);
 				}
 				break;
 		}
@@ -3534,14 +3614,18 @@ static int seminit ()
 			error ("ENOSPC\n");
 			error ("Try ipcrm'ing all the semaphores (check them using ipcs)\n");
 		}
-		error ("semget(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("semget(): %s (%d)\n", buf, errno);
 		return -1;
 	}
 
 	/* initialize the semaphore value */
 	ick.val = 1;
 	if (semctl(sem_id, 0, SETVAL, ick) < 0) {
-		error ("semctl(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+		strerror_r(errno, buf, 1024);
+		error ("semctl(): %s (%d)\n", buf, errno);
 		semdestroy (sem_id);
 		return -1;
 	}
@@ -3564,7 +3648,9 @@ static void semwait (int sem_id)
 {
 	while (semop(sem_id, &op_wait, 1) < 0) {
 		if (errno != EINTR) {
-			error ("semop(): %s (%d)\n", sys_errlist[errno], errno);
+			char buf[1024];
+			strerror_r(errno, buf, 1024);
+			error ("semop(): %s (%d)\n", buf, errno);
 			pktd_exit(1);
 		}
 	}
@@ -3592,7 +3678,9 @@ static int semtrywait (int sem_id)
 			/* the semaphore was locked */
 			return -1;
 		} else if (errno != EINTR) {
-			error ("semop(): %s (%d)\n", sys_errlist[errno], errno);
+			char buf[1024];
+			strerror_r(errno, buf, 1024);
+			error ("semop(): %s (%d)\n", buf, errno);
 			pktd_exit(1);
 		}
 	}
@@ -3615,7 +3703,9 @@ static void sempost (int sem_id)
 {
 	while (semop(sem_id, &op_post, 1) < 0) {
 		if (errno != EINTR) {
-			error ("semop(): %s (%d)\n", sys_errlist[errno], errno);
+			char buf[1024];
+			strerror_r(errno, buf, 1024);
+			error ("semop(): %s (%d)\n", buf, errno);
 			pktd_exit(1);
 		}
 	}

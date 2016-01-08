@@ -100,7 +100,9 @@ int my_callback (const u_char *pkt, struct timeval ts, int len,
 	if ((lfwrite (fp, packet_header, TCPDUMP_PACKET_HEADER_LENGTH) < 
 			TCPDUMP_PACKET_HEADER_LENGTH) ||
 			(lfwrite (fp, pkt, caplen) < caplen)) {
-		printf ("my_callback(): %s (%d)\n", sys_errlist[errno], errno);
+		char buf[1024];
+    strerror_r(errno, buf, 1024);
+		printf ("my_callback(): %s (%d)\n", buf, errno);
 		exit (1);
 	}
 

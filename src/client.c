@@ -607,7 +607,9 @@ int packet_callback (const u_char *pkt, struct timeval ts, int len,
 			if ((lfwrite (fp, packet_header, TCPDUMP_PACKET_HEADER_LENGTH) < 
 					TCPDUMP_PACKET_HEADER_LENGTH) ||
 					(lfwrite (fp, (void*)pkt, caplen) < caplen)) {
-				printf ("packet_callback(): %s (%d)\n", sys_errlist[errno], errno);
+				char buf[1024];
+				strerror_r(errno, buf, 1024);
+				printf ("packet_callback(): %s (%d)\n", buf, errno);
 				exit (1);
 			}
 			break;
@@ -615,7 +617,9 @@ int packet_callback (const u_char *pkt, struct timeval ts, int len,
 		case 5:
 			/* dump compressed data to disk */
 			if (lfwrite (fp, (void*)pkt, len) < len) {
-				printf ("packet_callback(): %s (%d)\n", sys_errlist[errno], errno);
+				char buf[1024];
+				strerror_r(errno, buf, 1024);
+				printf ("packet_callback(): %s (%d)\n", buf, errno);
 				exit (1);
 			}
 			break;

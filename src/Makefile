@@ -35,7 +35,7 @@
 # - libwire is the library clients use
 # - client contains several example clients
 # - pktzip is a trace compressor/uncompressor
-ALL = pktd lstdio trace-codec libwire client pktzip
+ALL = pktd client
 
 # XXX: get the OS
 #OS:sh =uname -s
@@ -103,26 +103,26 @@ all: $(ALL)
 OBJS = wire.o daemon.o protocol.o client.o pktzip.o log.o
 SRC = $(OBJS:.o=.c)
 
-protocol:
-	$(CC) $(CFLAGS) -c $@.c
+protocol.o: protocol.h protocol.c
+	$(CC) $(CFLAGS) -c protocol.c
 
-log:
-	$(CC) $(CFLAGS) -c $@.c
+log.o: log.h log.c
+	$(CC) $(CFLAGS) -c log.c
 
-trace-codec: trace-codec.h trace-codec.c
-	$(CC) $(CFLAGS) -c $@.c -o $@.o
+trace-codec.o: trace-codec.h trace-codec.c
+	$(CC) $(CFLAGS) -c trace-codec.c -o trace-codec.o
 
-lstdio: lstdio.h lstdio.c
-	$(CC) $(CFLAGS) -c $@.c -o $@.o
-	ar cr liblstdio.a $@.o
+lstdio.o: lstdio.h lstdio.c
+	$(CC) $(CFLAGS) -c lstdio.c -o lstdio.o
+	ar cr liblstdio.a lstdio.o
 
 
-pktd: protocol log injection lstdio trace-codec
+pktd: protocol.o log.o injection.o lstdio.o trace-codec.o daemon.h daemon.c
 	$(CC) $(CFLAGS) -O -funroll-loops -c daemon.c
 	$(CC) $(CFLAGS) -O -funroll-loops -o $@ daemon.o protocol.o log.o injection.o trace-codec.o $(LDFLAGS)
 
 
-libwire: protocol trace-codec
+libwire: protocol.o trace-codec.o
 	$(CC) $(CFLAGS) -c -O wire.c
 	# uncomment the following line to compile on FreeBSD/Linux
 	ar cr $@.a wire.o protocol.o trace-codec.o
@@ -130,14 +130,14 @@ libwire: protocol trace-codec
 	#gcc -G -o $@.so wire.o protocol.o $(LDFLAGS)
 
 
-client: libwire
+client: client.c libwire
 	# uncomment the following line to compile on FreeBSD/Linux
 	$(CC) $(CFLAGS) -o $@ $@.c libwire.a $(LDFLAGS)
 	# uncomment the following line to compile on Solaris (dynamic libraries)
 	#gcc -G $(CFLAGS) -o $@ $@.c $(LDFLAGS)
 
 
-pktzip: libwire protocol
+pktzip: libwire protocol.o
 	# uncomment the following line to compile on FreeBSD/Linux
 	$(CC) $(CFLAGS) -o $@ $@.c protocol.o libwire.a $(LDFLAGS)
 	# uncomment the following line to compile on Solaris (dynamic libraries)

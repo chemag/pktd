@@ -38,7 +38,7 @@
 
 #include <syslog.h>
 
-static LogLevel log_level = SYSLOG_LEVEL_INFO;
+LogLevel log_level = SYSLOG_LEVEL_INFO;
 static int log_on_syslog = 0;
 static int log_facility = LOG_AUTH;
 static char *argv0;

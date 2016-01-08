@@ -44,7 +44,9 @@
 #include <sys/time.h>
 #include <stdlib.h>
 
-#if (defined(__svr4__) || defined(__SVR4))
+#if defined(__linux__)
+#include "bpf.h"
+#elif (defined(__svr4__) || defined(__SVR4))
 #include <resolv.h>
 #include "bpf.h"
 #else
@@ -183,10 +185,10 @@ m_xhalf(m, k, err)
  */
 u_int
 bpf_filter(pc, p, wirelen, buflen)
-	register struct bpf_insn *pc;
-	register u_char *p;
+	const struct bpf_insn *pc;
+	const u_char *p;
 	u_int wirelen;
-	register u_int buflen;
+	u_int buflen;
 {
 	register u_int32 A, X;
 	register int k;
@@ -487,11 +489,11 @@ bpf_filter(pc, p, wirelen, buflen)
  */
 int
 bpf_validate(f, len)
-	struct bpf_insn *f;
+	const struct bpf_insn *f;
 	int len;
 {
 	register int i;
-	register struct bpf_insn *p;
+	const struct bpf_insn *p;
 
 	for (i = 0; i < len; ++i) {
 		/*

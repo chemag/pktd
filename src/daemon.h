@@ -37,7 +37,9 @@
 
 
 
-#if (defined(__svr4__) || defined(__SVR4))
+#if defined(__linux__)
+#include "bpf.h"
+#elif (defined(__svr4__) || defined(__SVR4))
 #include "bpf.h"
 #else
 #include <net/bpf.h>
