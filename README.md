@@ -2,7 +2,9 @@ pktd: A Packet Capture and Injection Daemon
 -------------------------------------------
 
 Copyright (c) 2001 - 2002 The International Computer Science Institute
+
 Copyright (c) 2002 - 2002 Lawrence Berkeley National Laboratory
+
 Copyright (c) 2002 - 2002 Jose Maria Gonzalez (chema@cs.berkeley.edu)
 
 
@@ -23,7 +25,7 @@ administrators to vet the individual measurement tool
 
 The PAM 2003 (Proceedings of the 4th International workshop on Passive
 and Active network Measurement, PAM 2003) paper is available
-[here](http://github.com/chemag/pktd/doc/gonzalez_and_paxson.pktd_a_packet_capture_and_injection_daemon.pdf).
+[here](http://github.com/chemag/pktd/blob/master/doc/gonzalez_and_paxson.pktd_a_packet_capture_and_injection_daemon.pdf).
 
 
 # Introduction
@@ -42,7 +44,7 @@ our objective of providing different measurement rights. For example,
 Solaris and BPF-based architectures - most BSD Operating Systems - 
 implement network device access rights based on classic owner/group/other 
 read/write access associated to a file - in this case a virtual device, 
-called /dev/bpf%x in BSD. If a client has read access to this device, 
+called `/dev/bpf%x` in BSD. If a client has read access to this device, 
 she can add any filter she wishes, including promiscuous-mode ones. 
 There is no way of implementing fine-grained policies, as allowing 
 her to access only to the IP and TCP headers of all traffic in a 
@@ -53,7 +55,7 @@ network device have to be root or setuid.
 
 Some operating systems present further limitations in the access to the 
 network device. BPF-based devices only permit one process listening 
-to each /dev/bpfx virtual device, which effectively impedes a large 
+to each `/dev/bpf%x` virtual device, which effectively impedes a large 
 number of measurement clients trying to work at the same time. 
 
 
@@ -150,10 +152,10 @@ the client's requests, including packet injection requests.
 fmgr and the smgr exchange data in one of the following two 
 different ways:
 
-  1. through a mmap'ed table (pktd_table) synchronized with semaphores. 
+  * through a mmap'ed table (pktd_table) synchronized with semaphores. 
   You have to compile the code with the flag -DIPC_USING_SHMEM_SEM
 
-  2. using loopback-interface sockets. You have to compile the code with 
+  * using loopback-interface sockets. You have to compile the code with 
   the flag -DIPC_USING_SOCKETS 
 
 
@@ -173,11 +175,10 @@ VP's wire library.
 
 In order to compile and run pktd (aka pcapd), you need:
 
-* gcc, but not the infamous gcc-2.96 version
-  http://gcc.gnu.org/gcc-2.96.html
-  http://www.faqs.org/faqs/C-faq/faq/ section 15.10
+* gcc, but not the infamous (gcc-2.96 version)[http://gcc.gnu.org/gcc-2.96.html]
+  See http://www.faqs.org/faqs/C-faq/faq/ section 15.10
 * read access to the packet filter device. This means read access to 
-  /dev/bpfx in BSD, read access to /dev/hme in Solaris, and being 
+  `/dev/bpfx` in BSD, read access to `/dev/hme` in Solaris, and being 
   root in Linux,
 * libpcap 0.5 or newer (www.tcpdump.org.), 
 * libnet 1.0.2a or newer (www.packetfactory.net./Projects/Libnet), in 
